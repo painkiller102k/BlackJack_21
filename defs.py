@@ -11,7 +11,9 @@ import tkinter as tk
 RESULTS_FILE = "results.txt"
 
 def read_card():
-    return random.randint(1, 11)
+    karta = random.randint(2, 11)
+    mast = random.choice(['♠', '♥', '♦', '♣'])
+    return (karta, mast)
 
 def calculate_result(player_card, computer_card):
     if player_card > computer_card:
