@@ -1,16 +1,37 @@
 import random
 import tkinter as tk
+import json 
+import os
 
 RESULTS_FILE = "results.txt"
+balance_file = "balance.json"
+
+def load_balances():
+    if not os.path.exists(balance_file):
+        return {}
+    with open(balance_file, "r") as f:
+        return json.load(f)
+
+def save_balances(data):
+    with open(balance_file, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def get_balance(name):
+    data = load_balances()
+    return data.get(name, 1000)
+
+def set_balance(name, new_amount):
+    data = load_balances()
+    data[name] = new_amount
+    save_balances(data)
 
 def read_card():
-    """Возвращает случайную карту и её масть."""
     value = random.randint(2, 11)
     suit = random.choice(['♠', '♥', '♦', '♣'])
     return value, suit
 
 def calculate_result(player_sum, computer_sum):
-    """Определяет победителя."""
     if player_sum > 21:
         return "Вы проиграли! Перебор."
     elif computer_sum > 21:
@@ -23,12 +44,10 @@ def calculate_result(player_sum, computer_sum):
         return "Ничья!"
 
 def save_result(name, result, player_sum):
-    """Сохраняет результат игры в файл."""
     with open(RESULTS_FILE, "a", encoding="utf-8") as file:
         file.write(f"{name}: {result} (Очки: {player_sum})\n")
 
 def show_history():
-    """Открывает новое окно с историей игр."""
     try:
         with open(RESULTS_FILE, "r", encoding="utf-8") as file:
             lines = file.readlines()
@@ -53,18 +72,15 @@ def show_history():
     close_button.pack(pady=5)
 
 def play_computer():
-    """Генерирует сумму очков для компьютера."""
     total = 0
     while total < 17:
         value, _ = read_card()
         total += value
 
     while 17 <= total < 21:
-        risk = random.random()
-        if risk < 0.3:  # 30% шанс взять ещё одну карту
+        if random.random() < 0.3:
             value, _ = read_card()
             total += value
         else:
             break
-
     return total

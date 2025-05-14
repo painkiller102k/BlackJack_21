@@ -1,23 +1,37 @@
-# main.py
 from gui import build_gui
-from functions import read_card, play_computer, calculate_result, save_result, show_history
+from functions import read_card, play_computer, calculate_result, save_result, show_history, get_balance, set_balance
+from tkinter import simpledialog
 
 player_cards = []
 player_sum = 0
 player_name = ""
-widgets = {}  # Глобально, чтобы было доступно в функциях
+game_over = False
+player_balance = 0
+current_bet = 0
 
 def start_game(name):
-    global player_cards, player_sum, player_name
+    global player_cards, player_sum, player_name, game_over, player_balance, current_bet
     player_cards = []
     player_sum = 0
     player_name = name.strip()
+    game_over = False
 
     if not player_name:
-        widgets["status"].configure(text="Введите имя, чтобы начать игру!")
+        widgets["status"].configure(text="Введите имя перед началом игры.")
         return
 
-    for _ in range(2):
+    player_balance = get_balance(player_name)
+    if player_balance <= 0:
+        widgets["status"].configure(text="У вас недостаточно фишек для игры.")
+        return
+
+    current_bet = simpledialog.askinteger("Ставка", f"Ваш баланс: {player_balance} фишек. Введите ставку:",
+                                          minvalue=1, maxvalue=player_balance)
+    if not current_bet:
+        widgets["status"].configure(text="Ставка не была введена.")
+        return
+
+    for i in range(2):
         card, suit = read_card()
         player_cards.append((card, suit))
         player_sum += card
@@ -25,54 +39,90 @@ def start_game(name):
     update_status(f"{player_name}, ваши карты: {cards_to_str()} | Сумма: {player_sum}")
 
     if player_sum > 21:
-        end_game("Перебор! Вы проиграли!")
 
+        player_balance -= current_bet
+        set_balance(player_name, player_balance)
+        end_game(f"Перебор! Вы проиграли.У Вас осталось {player_sum}")
+    else:
+        toggle_game_controls(True)
 
 def take_card():
-    global player_sum
+    global player_balance
     if not player_name:
-        update_status("Сначала введите имя и начните игру.")
+        widgets["status"].configure(text="Введите имя перед началом игры.")
         return
-
+    global player_sum, game_over
+    if game_over:
+        return
     card, suit = read_card()
     player_cards.append((card, suit))
     player_sum += card
 
     if player_sum > 21:
-        update_status(f"Перебор! Вы взяли {card}{suit}. Сумма: {player_sum}")
-        end_game("Перебор! Вы проиграли!")
+        player_balance -= current_bet
+        set_balance(player_name, player_balance)
+        update_status(f"Перебор! Вы проиграли.У Вас осталось {player_sum}")
+        end_game(f"Перебор! Вы проиграли.У Вас осталось {player_sum}")
     else:
-        update_status(f"Взяли карту: {card}{suit}. Сумма: {player_sum}")
-
+        update_status(f"Взяли: {card}{suit}. Сумма: {player_sum}")
 
 def stop_game():
-    if not player_name:
-        update_status("Сначала введите имя и начните игру.")
+    global game_over, player_balance
+    if game_over:
         return
-
     computer_sum = play_computer()
     result = calculate_result(player_sum, computer_sum)
-    update_status(f"{result} (Компьютер: {computer_sum})")
-    end_game(result)
 
+    message = f"{result} (Компьютер: {computer_sum})"
+    if result.startswith("Вы выиграли"):
+        player_balance += current_bet
+        set_balance(player_name, player_balance)
+        message += f"\nВы выиграли {current_bet} фишек. Баланс: {player_balance}."
+    elif result.startswith("Вы проиграли"):
+        player_balance -= current_bet
+        set_balance(player_name, player_balance)
+        message += f"\nВы проиграли {current_bet} фишек. Осталось: {player_balance}."
+
+    update_status(message)
+    end_game(result)
 
 def show_game_history():
     show_history()
 
-
 def update_status(message):
     widgets["status"].configure(text=message)
-
 
 def cards_to_str():
     return " ".join(f"{v}{s}" for v, s in player_cards)
 
-
 def end_game(result):
+    global game_over
+    game_over = True
     save_result(player_name, result, player_sum)
-    widgets["status"].configure(text=result)
-    start_game(player_name)  # Перезапуск игры после окончания
+    update_status(f"{widgets['status'].cget('text')}\nНажмите 'Начать игру' для новой партии.")
+    toggle_game_controls(False)
 
-# Запуск GUI
+def toggle_game_controls(in_game):
+    if in_game:
+        widgets["btn_start"].pack_forget()
+        widgets["btn_history"].pack_forget()
+        widgets["entry"].pack_forget()
+
+        widgets["btn_take"].grid()
+        widgets["btn_stop"].grid()
+    else:
+        widgets["btn_start"].pack(pady=0, side="left", padx=10)
+        widgets["btn_history"].pack(pady=0, side="left", padx=10)
+        widgets["entry"].pack(pady=(5, 20))
+
+        widgets["btn_take"].grid_remove()
+        widgets["btn_stop"].grid_remove()
+
+# GUI
 root, widgets = build_gui(start_game, take_card, stop_game, show_game_history)
+
+# Скрыть игровые кнопки в самом начале
+widgets["btn_take"].grid_remove()
+widgets["btn_stop"].grid_remove()
+
 root.mainloop()
